@@ -30,6 +30,43 @@ def analyze_logs(file_path):
     print(f"Total 500 errors found: {total}")
     return total
 
+def run_az_command(command_list):
+    print(f"Executing: {' '.join(command_list)}")
+    try:
+        result = subprocess.run(command_list, check=True, text=True, capture_output=True)
+        print(result.stdout)
+    except subprocess.CalledProcessError as e:
+        print(f"Error executing command!")
+        print(f"Error Code: {e.returncode}")
+        print(e.stderr)
+
+def create_vm():
+    rg_name = "rg-compute-prod-01"
+    vm_name = "vm-appserver-prod-01"
+    location = "canadaeast"
+
+    print("=== Creating Resource Group ===")
+    run_az_command(["az", "group", "create", "--name", rg_name, "--location", location])
+
+    print("=== Creating VM ===")
+    run_az_command(["az", "vm", "create",
+        "--resource-group", rg_name,
+        "--name", vm_name,
+        "--image", "Ubuntu2204",
+        "--size", "Standard_B2ats_v2",
+        "--storage-sku", "Standard_LRS",
+        "--admin-username", "azureuser",
+        "--generate-ssh-keys",
+        "--location", location,
+        "--nsg", ""])
+
+    print("=== Setting Auto-Shutdown ===")
+    run_az_command(["az", "vm", "auto-shutdown",
+        "--resource-group", rg_name,
+        "--name", vm_name,
+        "--time", "1800",
+        "--location", location])
+
 def main():
     print("=========================================")
     print("     SRE SYSTEM DIAGNOSTICS REPORT")
@@ -42,6 +79,12 @@ def main():
     print("=========================================")
     print("          END OF REPORT")
     print("=========================================")
+
+    choice = input("\nDeploy to Azure? (y/n): ")
+    if choice.lower() == "y":
+        create_vm()
+    else:
+        print("Skipping Azure deployment.")
 
 
 if __name__ == "__main__":
