@@ -1,27 +1,104 @@
 import subprocess
+import datetime
 
 def get_memory():
-  print("=== Memory Usage ===")
-  memory = subprocess.run(["free", "-h"], capture_output=True, text=True)
-  print(memory.stdout)
+    result = subprocess.run(["free", "-h"], capture_output=True, text=True)
+    lines = result.stdout.strip().split("\n")
+    mem_line = lines[1].split()
+    total = mem_line[1]
+    used = mem_line[2]
+    available = mem_line[6]
+    
+    # Get percentage
+    result2 = subprocess.run(["free"], capture_output=True, text=True)
+    lines2 = result2.stdout.strip().split("\n")
+    mem2 = lines2[1].split()
+    total_kb = int(mem2[1])
+    used_kb = int(mem2[2])
+    percent = round((used_kb / total_kb) * 100, 2)
+    
+    status = "WARNING" if percent > 80 else "NORMAL"
+    
+    print("Memory")
+    print("-" * 20)
+    print(f"Average Usage   : {percent}%")
+    print(f"Peak Usage      : {percent}%")
+    print(f"Status          : {status}")
+    print()
 
 def get_disk():
-   print("=== Disk Usage ===")
-   disk = subprocess.run(["df", "-h"], capture_output=True, text=True)
-   print(disk.stdout)
+    result = subprocess.run(["df", "-h", "/"], capture_output=True, text=True)
+    lines = result.stdout.strip().split("\n")
+    disk_line = lines[1].split()
+    available = disk_line[3]
+    percent_used = disk_line[4].replace("%", "")
+    
+    status = "WARNING" if int(percent_used) > 80 else "NORMAL"
+    
+    print("Disk")
+    print("-" * 20)
+    print(f"Usage           : {percent_used}%")
+    print(f"Available       : {available}")
+    print(f"Status          : {status}")
+    print()
 
 def get_cpu():
-   print("=== CPU Usage ===")
-   cpu = subprocess.run("ps aux --sort=-%cpu | head -10", capture_output=True, text=True, shell=True)
-   print(cpu.stdout)
+    result = subprocess.run(["ps", "-A", "-o", "%cpu"], capture_output=True, text=True)
+    values = [float(x) for x in result.stdout.strip().split("\n")[1:] if x.strip()]
+    avg = round(sum(values) / len(values), 2) if values else 0
+    peak = round(max(values), 2) if values else 0
+    
+    status = "WARNING" if avg > 80 else "NORMAL"
+    
+    print("CPU")
+    print("-" * 20)
+    print(f"Average Usage   : {avg}%")
+    print(f"Peak Usage      : {peak}%")
+    print(f"Status          : {status}")
+    print()
 
 def get_network():
-   print("=== Network Usage ===")
-   network = subprocess.run(["ss", "-tuln"], capture_output=True, text=True)
-   print(network.stdout)
+    result = subprocess.run(["ss", "-tuln"], capture_output=True, text=True)
+    lines = result.stdout.strip().split("\n")[1:]
+    
+    print("Listening Ports")
+    print("-" * 20)
+    print()
+    
+    internal = []
+    local = []
+    
+    for line in lines:
+        parts = line.split()
+        if len(parts) >= 5:
+            proto = parts[0]
+            addr_port = parts[4]
+            if ":" in addr_port:
+                addr, port = addr_port.rsplit(":", 1)
+                if "127" in addr or "::1" in addr:
+                    local.append((proto, addr, port))
+                else:
+                    internal.append((proto, addr, port))
+    
+    print("INTERNAL")
+    print("-" * 20)
+    print(f"{'Protocol':<10} {'Host':<25} {'Port':<10} {'Service'}")
+    print("-" * 60)
+    for proto, addr, port in internal:
+        service = "DNS" if port == "53" else "Unknown"
+        print(f"{proto:<10} {addr:<25} {port:<10} {service}")
+    
+    print()
+    print("LOCALHOST")
+    print("-" * 20)
+    print(f"{'Protocol':<10} {'Host':<25} {'Port':<10} {'Service'}")
+    print("-" * 60)
+    for proto, addr, port in local:
+        service = "DNS" if port == "53" else "Local"
+        print(f"{proto:<10} {addr:<25} {port:<10} {service}")
+    print()
 
 def analyze_logs(file_path):
-    print("=== Log Analysis ===")
     total_lines = 0
     error_500 = 0
     error_404 = 0
@@ -40,13 +117,18 @@ def analyze_logs(file_path):
             if "200" in line:
                 success_200 += 1
 
-    print(f"  Total Requests:     {total_lines}")
-    print(f"  200 OK:             {success_200}")
-    print(f"  401 Unauthorized:   {error_401}")
-    print(f"  404 Not Found:      {error_404}")
-    print(f"  500 Server Errors:  {error_500}")
+    print("Log Analysis")
+    print("-" * 20)
+    print(f"Total Requests  : {total_lines}")
+    print(f"200 OK          : {success_200}")
+    print(f"401 Unauthorized: {error_401}")
+    print(f"404 Not Found   : {error_404}")
+    print(f"500 Errors      : {error_500}")
     if error_500 > 0:
-        print(f"WARNING: {error_500} server errors detected!")
+        print(f"Status          : WARNING - {error_500} server error(s) detected!")
+    else:
+        print(f"Status          : NORMAL")
+    print()
 
 def run_az_command(command_list):
     print(f"Executing: {' '.join(command_list)}")
