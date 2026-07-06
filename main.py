@@ -22,13 +22,31 @@ def get_network():
 
 def analyze_logs(file_path):
     print("=== Log Analysis ===")
-    total = 0
+    total_lines = 0
+    error_500 = 0
+    error_404 = 0
+    error_401 = 0
+    success_200 = 0
+
     with open(file_path, "r") as file:
         for line in file:
+            total_lines += 1
             if "500" in line:
-                total += 1
-    print(f"Total 500 errors found: {total}")
-    return total
+                error_500 += 1
+            if "404" in line:
+                error_404 += 1
+            if "401" in line:
+                error_401 += 1
+            if "200" in line:
+                success_200 += 1
+
+    print(f"  Total Requests:     {total_lines}")
+    print(f"  200 OK:             {success_200}")
+    print(f"  401 Unauthorized:   {error_401}")
+    print(f"  404 Not Found:      {error_404}")
+    print(f"  500 Server Errors:  {error_500}")
+    if error_500 > 0:
+        print(f"WARNING: {error_500} server errors detected!")
 
 def run_az_command(command_list):
     print(f"Executing: {' '.join(command_list)}")
@@ -43,7 +61,7 @@ def run_az_command(command_list):
 def create_vm():
     print("Authenticating with Azure...")
     subprocess.run(["az", "login"], check=False)
-    
+
     location = "canadaeast"
 
     # Let the user choose resource group (folder)
@@ -103,6 +121,11 @@ def create_vm():
         "--name", vm_name,
         "--time", "1800",
         "--location", location])
+    teardown = input("\nRun teardown when done? (y/n): ")
+    if teardown.lower() == "y":
+        print("=== Tearing Down Resources ===")
+        run_az_command(["az", "group", "delete", "--name", rg_name, "--yes", "--no-wait"])
+        print("Teardown initiated!")
 
 def main():
     print("=========================================")
