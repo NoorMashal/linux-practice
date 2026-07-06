@@ -41,12 +41,49 @@ def run_az_command(command_list):
         print(e.stderr)
 
 def create_vm():
-    rg_name = "rg-compute-prod-01"
-    vm_name = "vm-appserver-prod-01"
+    print("Authenticating with Azure...")
+    subprocess.run(["az", "login"], check=False)
+    
     location = "canadaeast"
 
-    print("=== Creating Resource Group ===")
-    run_az_command(["az", "group", "create", "--name", rg_name, "--location", location])
+    # Let the user choose resource group (folder)
+    print("=== List of existing Resource Groups ===")
+    result = subprocess.run(["az", "group", "list", "--query", "[].name", "-o", "tsv"], capture_output=True, text=True)
+    print(result.stdout)
+
+    rg_choice = input("Enter the name of the Resource Group to use (or type 'new' to create a new one): ")
+
+    # Make sure the user enters a valid choice
+    while True:
+        if rg_choice in result.stdout.splitlines() or rg_choice.lower() == "new":
+            break
+        else:
+            print("Invalid choice. Please enter a valid Resource Group name or 'new'.")
+            rg_choice = input("Enter the name of the Resource Group to use (or type 'new' to create a new one): ")
+    
+    if rg_choice.lower() == "new":
+        rg_name = input("Enter the name for the new Resource Group: ").strip()
+        print("=== Creating Resource Group ===")
+        run_az_command(["az", "group", "create", "--name", rg_name, "--location", location])
+    else:
+        rg_name = rg_choice
+
+    if rg_choice.lower() == "new": # If the user chose to create a new resource group, prompt for VM name without checking for duplicates
+        vm_name = input("Enter the name for the new VM: ").strip()
+
+    else: # Check if the VM name already exists in the resource group
+        result = subprocess.run(["az", "vm", "list", "--resource-group", rg_name, "--query", "[].name", "-o", "tsv"], capture_output=True, text=True)
+        existing_vms = result.stdout.splitlines()
+        print("=== List of existing VMs in Resource Group ===")
+        print(result.stdout)
+        
+        # Check if the VM name already exists in the resource group
+        while True:
+            vm_name = input("Enter the name for the new VM: ").strip()
+            if vm_name in existing_vms:
+                print(f"VM name '{vm_name}' already exists in Resource Group '{rg_name}'. Please choose a different name.")
+            else:
+                break
 
     print("=== Creating VM ===")
     run_az_command(["az", "vm", "create",
